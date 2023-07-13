@@ -5,13 +5,15 @@
 projectDir="/home/skalogerakis/Documents/Workspace" #Kalogerakis LocalPC
 
 # Untar compressed file into a temporary location
-tar -xvf  ${projectDir}/hadoop/hadoop-hdfs-project/hadoop-hdfs/target/hadoop-hdfs-3.2.2.tar.gz -C $HOME
-#tar -xvf  ${projectDir}/hadoop/hadoop-dist/target/hadoop-3.2.2.tar.gz -C $HOME
+#tar -xvf  ${projectDir}/hadoop/hadoop-hdfs-project/hadoop-hdfs/target/hadoop-hdfs-3.2.2.tar.gz -C $HOME
+tar -xvf  ${projectDir}/hadoop/hadoop-dist/target/hadoop-3.2.2.tar.gz -C $HOME
 
 echo  "Extracting new version completed.\n\n"
 
+rm -r $HADOOP_HOME
+
 # Prefer rsync than copy. We simply want to update the files in all the subdirectories
-rsync --update -raz --progress $HOME/hadoop-hdfs-3.2.2/. $HADOOP_HOME
+rsync --update -raz --progress $HOME/hadoop-3.2.2/. $HADOOP_HOME
 
 echo  "Copy new version to previous config completed\n\n"
 
@@ -22,4 +24,4 @@ echo  "Copy new version to previous config completed\n\n"
 echo  "Completed"
 
 # Remove temporary files
-rm -r $HOME/hadoop-hdfs-3.2.2/
+rm -r $HOME/hadoop-3.2.2/

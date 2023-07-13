@@ -607,10 +607,7 @@ public class BlockManager implements BlockStatsMXBean {
         DFSConfigKeys.DFS_NAMENODE_BLOCKREPORT_QUEUE_SIZE_DEFAULT);
     blockReportThread = new BlockReportProcessingThread(queueSize);
 
-    LOG.info("MYdefaultKalogerakis");
-    LOG.info("YOURdefaultKalogerakis");
-    LOG.info("MYsdasdfawsdawddefaultKalogerakis");
-    LOG.info("MYsdasdfawsdawddefaultKalogerakis");
+    LOG.info("Kalogerakis_v2");
     LOG.info("defaultReplication         = {}", defaultReplication);
     LOG.info("maxReplication             = {}", maxReplication);
     LOG.info("minReplication             = {}", minReplication);
