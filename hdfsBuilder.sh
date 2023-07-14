@@ -1,27 +1,29 @@
 #!/bin/sh
 
 # The default behavior is to ask for the directory where the project exists
-# projectDir=$1
-projectDir="/home/skalogerakis/Documents/Workspace" #Kalogerakis LocalPC
+PROJECT_DIR="/home/skalogerakis/Documents/Workspace/hadoop/" #Kalogerakis LocalPC
+VERSION="3.2.2"
+
+echo "Starting maven compilation\n"
+cd $PROJECT_DIR
+cd hadoop-maven-plugins/
+sudo mvn clean install
+cd ..
+sudo mvn package -Pdist -DskipTests -Dtar -Dmaven.javadoc.skip=true
+cd ..
+echo -e "Hadoop "$VERSION" compiled\n"
+
 
 # Untar compressed file into a temporary location
-#tar -xvf  ${projectDir}/hadoop/hadoop-hdfs-project/hadoop-hdfs/target/hadoop-hdfs-3.2.2.tar.gz -C $HOME
-tar -xvf  ${projectDir}/hadoop/hadoop-dist/target/hadoop-3.2.2.tar.gz -C $HOME
-
+tar -xvf  ${PROJECT_DIR}hadoop-dist/target/hadoop-${VERSION}.tar.gz -C $HOME
 echo  "Extracting new version completed.\n\n"
 
+sudo rm -r /tmp/hadoop*
 rm -r $HADOOP_HOME
 
 # Prefer rsync than copy. We simply want to update the files in all the subdirectories
-rsync --update -raz --progress $HOME/hadoop-3.2.2/. $HADOOP_HOME
-
+rsync --update -raz --progress $HOME/hadoop-${VERSION}/. $HADOOP_HOME
 echo  "Copy new version to previous config completed\n\n"
 
-# Assume that etc folder with configs exists in the directory of the script
-#'cp' -rf etc/ $HADOOP_HOME
-#rsync --update -raz --progress etc/ $HADOOP_HOME
-
-echo  "Completed"
-
 # Remove temporary files
-rm -r $HOME/hadoop-3.2.2/
+rm -r $HOME/hadoop-${VERSION}/
