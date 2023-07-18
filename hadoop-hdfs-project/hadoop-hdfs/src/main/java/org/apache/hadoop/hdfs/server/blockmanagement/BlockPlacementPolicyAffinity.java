@@ -55,21 +55,21 @@ import static org.apache.hadoop.util.Time.monotonicNow;
 public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
 
   private static final String enableDebugLogging =
-      "For more information, please enable DEBUG log level on "
-          + BlockPlacementPolicy.class.getName() + " and "
-          + NetworkTopology.class.getName();
+          "For more information, please enable DEBUG log level on "
+                  + BlockPlacementPolicy.class.getName() + " and "
+                  + NetworkTopology.class.getName();
 
   private static final ThreadLocal<StringBuilder> debugLoggingBuilder
-      = new ThreadLocal<StringBuilder>() {
-        @Override
-        protected StringBuilder initialValue() {
-          return new StringBuilder();
-        }
-      };
+          = new ThreadLocal<StringBuilder>() {
+    @Override
+    protected StringBuilder initialValue() {
+      return new StringBuilder();
+    }
+  };
 
   private static final ThreadLocal<HashMap<NodeNotChosenReason, Integer>>
-      CHOOSE_RANDOM_REASONS = ThreadLocal
-      .withInitial(() -> new HashMap<NodeNotChosenReason, Integer>());
+          CHOOSE_RANDOM_REASONS = ThreadLocal
+          .withInitial(() -> new HashMap<NodeNotChosenReason, Integer>());
 
   private enum NodeNotChosenReason {
     NOT_IN_SERVICE("the node is not in service"),
@@ -103,10 +103,11 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
 
   protected BlockPlacementPolicyAffinity() {
   }
-    
+
   @Override
-  public void initialize(Configuration conf,  FSClusterStats stats,
-                         NetworkTopology clusterMap, 
+  public void initialize(Configuration conf,
+                         FSClusterStats stats,
+                         NetworkTopology clusterMap,
                          Host2NodesMap host2datanodeMap) {
 
     this.stats = stats;
@@ -122,72 +123,77 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
 //    this.staleInterval = conf.getLong(
 //        DFSConfigKeys.DFS_NAMENODE_STALE_DATANODE_INTERVAL_KEY,
 //        DFSConfigKeys.DFS_NAMENODE_STALE_DATANODE_INTERVAL_DEFAULT);
-    this.preferLocalNode = conf.getBoolean(
-        DFSConfigKeys.
-            DFS_NAMENODE_BLOCKPLACEMENTPOLICY_DEFAULT_PREFER_LOCAL_NODE_KEY,
-        DFSConfigKeys.
-            DFS_NAMENODE_BLOCKPLACEMENTPOLICY_DEFAULT_PREFER_LOCAL_NODE_DEFAULT);
+//    this.preferLocalNode = conf.getBoolean(
+//            DFSConfigKeys.
+//                    DFS_NAMENODE_BLOCKPLACEMENTPOLICY_DEFAULT_PREFER_LOCAL_NODE_KEY,
+//            DFSConfigKeys.
+//                    DFS_NAMENODE_BLOCKPLACEMENTPOLICY_DEFAULT_PREFER_LOCAL_NODE_DEFAULT);
+    this.preferLocalNode = false;
   }
 
   @Override
   public DatanodeStorageInfo[] chooseTarget(String srcPath,
-                                    int numOfReplicas,
-                                    Node writer,
-                                    List<DatanodeStorageInfo> chosenNodes,
-                                    boolean returnChosenNodes,
-                                    Set<Node> excludedNodes,
-                                    long blocksize,
-                                    final BlockStoragePolicy storagePolicy,
-                                    EnumSet<AddBlockFlag> flags) {
+                                            int numOfReplicas,
+                                            Node writer,
+                                            List<DatanodeStorageInfo> chosenNodes,
+                                            boolean returnChosenNodes,
+                                            Set<Node> excludedNodes,
+                                            long blocksize,
+                                            final BlockStoragePolicy storagePolicy,
+                                            EnumSet<AddBlockFlag> flags) {
     return chooseTarget(numOfReplicas, writer, chosenNodes, returnChosenNodes,
-        excludedNodes, blocksize, storagePolicy, flags, null);
+            excludedNodes, blocksize, storagePolicy, flags, null);
   }
 
   @Override
-  public DatanodeStorageInfo[] chooseTarget(String srcPath, int numOfReplicas,
-      Node writer, List<DatanodeStorageInfo> chosen, boolean returnChosenNodes,
-      Set<Node> excludedNodes, long blocksize, BlockStoragePolicy storagePolicy,
-      EnumSet<AddBlockFlag> flags, EnumMap<StorageType, Integer> storageTypes) {
+  public DatanodeStorageInfo[] chooseTarget(String srcPath,
+                                            int numOfReplicas,
+                                            Node writer,
+                                            List<DatanodeStorageInfo> chosen,
+                                            boolean returnChosenNodes,
+                                            Set<Node> excludedNodes,
+                                            long blocksize,
+                                            BlockStoragePolicy storagePolicy,
+                                            EnumSet<AddBlockFlag> flags,
+                                            EnumMap<StorageType, Integer> storageTypes) {
     return chooseTarget(numOfReplicas, writer, chosen, returnChosenNodes,
-        excludedNodes, blocksize, storagePolicy, flags, storageTypes);
+            excludedNodes, blocksize, storagePolicy, flags, storageTypes);
   }
 
   @Override
   DatanodeStorageInfo[] chooseTarget(String src,
-      int numOfReplicas,
-      Node writer,
-      Set<Node> excludedNodes,
-      long blocksize,
-      List<DatanodeDescriptor> favoredNodes,
-      BlockStoragePolicy storagePolicy,
-      EnumSet<AddBlockFlag> flags) {
+                                     int numOfReplicas,
+                                     Node writer,
+                                     Set<Node> excludedNodes,
+                                     long blocksize,
+                                     List<DatanodeDescriptor> favoredNodes,
+                                     BlockStoragePolicy storagePolicy,
+                                     EnumSet<AddBlockFlag> flags) {
+    LOG.info("CHOOSE TARGET 2");
     try {
       if (favoredNodes == null || favoredNodes.size() == 0) {
         // Favored nodes not specified, fall back to regular block placement.
         return chooseTarget(src, numOfReplicas, writer,
-            new ArrayList<DatanodeStorageInfo>(numOfReplicas), false, 
-            excludedNodes, blocksize, storagePolicy, flags);
+                new ArrayList<DatanodeStorageInfo>(numOfReplicas), false,
+                excludedNodes, blocksize, storagePolicy, flags);
       }
 
-      Set<Node> favoriteAndExcludedNodes = excludedNodes == null ?
-          new HashSet<Node>() : new HashSet<>(excludedNodes);
-      final List<StorageType> requiredStorageTypes = storagePolicy
-          .chooseStorageTypes((short)numOfReplicas);
-      final EnumMap<StorageType, Integer> storageTypes =
-          getRequiredStorageTypes(requiredStorageTypes);
+      Set<Node> favoriteAndExcludedNodes = excludedNodes == null ? new HashSet<Node>() : new HashSet<>(excludedNodes);
+
+      final List<StorageType> requiredStorageTypes = storagePolicy.chooseStorageTypes((short)numOfReplicas);
+      final EnumMap<StorageType, Integer> storageTypes = getRequiredStorageTypes(requiredStorageTypes);
 
       // Choose favored nodes
       List<DatanodeStorageInfo> results = new ArrayList<>();
-      boolean avoidStaleNodes = stats != null
-          && stats.isAvoidingStaleDataNodesForWrite();
+      boolean avoidStaleNodes = stats != null && stats.isAvoidingStaleDataNodesForWrite();
 
       int maxNodesAndReplicas[] = getMaxNodesPerRack(0, numOfReplicas);
       numOfReplicas = maxNodesAndReplicas[0];
       int maxNodesPerRack = maxNodesAndReplicas[1];
 
       chooseFavouredNodes(src, numOfReplicas, favoredNodes,
-          favoriteAndExcludedNodes, blocksize, maxNodesPerRack, results,
-          avoidStaleNodes, storageTypes);
+              favoriteAndExcludedNodes, blocksize, maxNodesPerRack, results,
+              avoidStaleNodes, storageTypes);
 
       if (results.size() < numOfReplicas) {
         // Not enough favored nodes, choose other nodes, based on block
@@ -195,50 +201,51 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
         numOfReplicas -= results.size();
         for (DatanodeStorageInfo storage : results) {
           // add localMachine and related nodes to favoriteAndExcludedNodes
-          addToExcludedNodes(storage.getDatanodeDescriptor(),
-              favoriteAndExcludedNodes);
+          addToExcludedNodes(storage.getDatanodeDescriptor(), favoriteAndExcludedNodes);
         }
         DatanodeStorageInfo[] remainingTargets =
-            chooseTarget(src, numOfReplicas, writer,
-                new ArrayList<DatanodeStorageInfo>(numOfReplicas), false,
-                favoriteAndExcludedNodes, blocksize, storagePolicy, flags,
-                storageTypes);
+                chooseTarget(src, numOfReplicas, writer,
+                        new ArrayList<DatanodeStorageInfo>(numOfReplicas), false,
+                        favoriteAndExcludedNodes, blocksize, storagePolicy, flags,
+                        storageTypes);
         for (int i = 0; i < remainingTargets.length; i++) {
           results.add(remainingTargets[i]);
         }
       }
       return getPipeline(writer,
-          results.toArray(new DatanodeStorageInfo[results.size()]));
+              results.toArray(new DatanodeStorageInfo[results.size()]));
     } catch (NotEnoughReplicasException nr) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Failed to choose with favored nodes (=" + favoredNodes
-            + "), disregard favored nodes hint and retry.", nr);
+        LOG.debug("Failed to choose with favored nodes (=" + favoredNodes + "), disregard favored nodes hint and retry.", nr);
       }
       // Fall back to regular block placement disregarding favored nodes hint
-      return chooseTarget(src, numOfReplicas, writer, 
-          new ArrayList<DatanodeStorageInfo>(numOfReplicas), false, 
-          excludedNodes, blocksize, storagePolicy, flags);
+      return chooseTarget(src, numOfReplicas, writer,
+              new ArrayList<DatanodeStorageInfo>(numOfReplicas), false,
+              excludedNodes, blocksize, storagePolicy, flags);
     }
   }
 
-  protected void chooseFavouredNodes(String src, int numOfReplicas,
-      List<DatanodeDescriptor> favoredNodes,
-      Set<Node> favoriteAndExcludedNodes, long blocksize, int maxNodesPerRack,
-      List<DatanodeStorageInfo> results, boolean avoidStaleNodes,
-      EnumMap<StorageType, Integer> storageTypes)
-      throws NotEnoughReplicasException {
-    for (int i = 0; i < favoredNodes.size() && results.size() < numOfReplicas;
-        i++) {
+  protected void chooseFavouredNodes(String src,
+                                     int numOfReplicas,
+                                     List<DatanodeDescriptor> favoredNodes,
+                                     Set<Node> favoriteAndExcludedNodes,
+                                     long blocksize,
+                                     int maxNodesPerRack,
+                                     List<DatanodeStorageInfo> results,
+                                     boolean avoidStaleNodes,
+                                     EnumMap<StorageType, Integer> storageTypes) throws NotEnoughReplicasException {
+    LOG.info("chooseFavouredNodes INIT");
+
+    for (int i = 0; i < favoredNodes.size() && results.size() < numOfReplicas; i++) {
       DatanodeDescriptor favoredNode = favoredNodes.get(i);
       // Choose a single node which is local to favoredNode.
       // 'results' is updated within chooseLocalNode
       final DatanodeStorageInfo target = chooseLocalOrFavoredStorage(
-          favoredNode, true, favoriteAndExcludedNodes, blocksize,
-          maxNodesPerRack, results, avoidStaleNodes, storageTypes);
+              favoredNode, true, favoriteAndExcludedNodes, blocksize,
+              maxNodesPerRack, results, avoidStaleNodes, storageTypes);
 
       if (target == null) {
-        LOG.warn("Could not find a target for file " + src
-            + " with favored node " + favoredNode);
+        LOG.warn("Could not find a target for file " + src + " with favored node " + favoredNode);
         continue;
       }
       favoriteAndExcludedNodes.add(target.getDatanodeDescriptor());
@@ -247,39 +254,50 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
 
   /** This is the implementation. */
   private DatanodeStorageInfo[] chooseTarget(int numOfReplicas,
-                                    Node writer,
-                                    List<DatanodeStorageInfo> chosenStorage,
-                                    boolean returnChosenNodes,
-                                    Set<Node> excludedNodes,
-                                    long blocksize,
-                                    final BlockStoragePolicy storagePolicy,
-                                    EnumSet<AddBlockFlag> addBlockFlags,
-                                    EnumMap<StorageType, Integer> sTypes) {
+                                             Node writer,
+                                             List<DatanodeStorageInfo> chosenStorage,
+                                             boolean returnChosenNodes,
+                                             Set<Node> excludedNodes,
+                                             long blocksize,
+                                             final BlockStoragePolicy storagePolicy,
+                                             EnumSet<AddBlockFlag> addBlockFlags,
+                                             EnumMap<StorageType, Integer> sTypes) {
+    LOG.info("chooseTarget Implementation INIT");
     if (numOfReplicas == 0 || clusterMap.getNumOfLeaves()==0) {
       return DatanodeStorageInfo.EMPTY_ARRAY;
     }
-      
+
     if (excludedNodes == null) {
       excludedNodes = new HashSet<>();
     }
-     
+
     int[] result = getMaxNodesPerRack(chosenStorage.size(), numOfReplicas);
     numOfReplicas = result[0];
     int maxNodesPerRack = result[1];
-      
+    LOG.info("choseTarget numOfReplicas {}, maxnodesperrack {}", numOfReplicas, maxNodesPerRack);
+
     for (DatanodeStorageInfo storage : chosenStorage) {
+      //TODO THIS WAS NOT SHOWN
+      LOG.info("Chosen Storage IP = {}", storage.getDatanodeDescriptor().getIpAddr());
       // add localMachine and related nodes to excludedNodes
       addToExcludedNodes(storage.getDatanodeDescriptor(), excludedNodes);
     }
 
     List<DatanodeStorageInfo> results = null;
     Node localNode = null;
-    boolean avoidStaleNodes = (stats != null
-        && stats.isAvoidingStaleDataNodesForWrite());
+//    boolean avoidStaleNodes = (stats != null && stats.isAvoidingStaleDataNodesForWrite());
+    boolean avoidStaleNodes = false;
+
+    //TODO SK_EDIT
+    addBlockFlags.add(AddBlockFlag.NO_LOCAL_WRITE);
+
     boolean avoidLocalNode = (addBlockFlags != null
-        && addBlockFlags.contains(AddBlockFlag.NO_LOCAL_WRITE)
-        && writer != null
-        && !excludedNodes.contains(writer));
+            && addBlockFlags.contains(AddBlockFlag.NO_LOCAL_WRITE)
+            && writer != null
+            && !excludedNodes.contains(writer));
+
+    LOG.info("Avoid Local {}", avoidLocalNode);
+
     // Attempt to exclude local node if the client suggests so. If no enough
     // nodes can be obtained, it falls back to the default block placement
     // policy.
@@ -290,31 +308,34 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
         excludedNodeCopy.add(writer);
       }
       localNode = chooseTarget(numOfReplicas, writer,
-          excludedNodeCopy, blocksize, maxNodesPerRack, results,
-          avoidStaleNodes, storagePolicy,
-          EnumSet.noneOf(StorageType.class), results.isEmpty(), sTypes);
+              excludedNodeCopy, blocksize, maxNodesPerRack, results,
+              avoidStaleNodes, storagePolicy,
+              EnumSet.noneOf(StorageType.class), results.isEmpty(), sTypes);
       if (results.size() < numOfReplicas) {
         // not enough nodes; discard results and fall back
         results = null;
       }
     }
+
+    //TODO this must be the default policy
     if (results == null) {
+      LOG.info("chooseTarget this must be the default policy");
       results = new ArrayList<>(chosenStorage);
       localNode = chooseTarget(numOfReplicas, writer, excludedNodes,
-          blocksize, maxNodesPerRack, results, avoidStaleNodes,
-          storagePolicy, EnumSet.noneOf(StorageType.class), results.isEmpty(),
-          sTypes);
+              blocksize, maxNodesPerRack, results, avoidStaleNodes,
+              storagePolicy, EnumSet.noneOf(StorageType.class), results.isEmpty(),
+              sTypes);
     }
 
-    if (!returnChosenNodes) {  
+    if (!returnChosenNodes) {
       results.removeAll(chosenStorage);
     }
-      
+
+    LOG.info("Return the Pipeline");
     // sorting nodes to form a pipeline
     return getPipeline(
-        (writer != null && writer instanceof DatanodeDescriptor) ? writer
-            : localNode,
-        results.toArray(new DatanodeStorageInfo[results.size()]));
+            (writer != null && writer instanceof DatanodeDescriptor) ? writer : localNode,
+            results.toArray(new DatanodeStorageInfo[results.size()]));
   }
 
   /**
@@ -331,6 +352,7 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
    *         using the target number of replicas.
    */
   protected int[] getMaxNodesPerRack(int numOfChosen, int numOfReplicas) {
+    LOG.info("GET MAX NODES PER RACK");
     int clusterSize = clusterMap.getNumOfLeaves();
     int totalNumOfReplicas = numOfChosen + numOfReplicas;
     if (totalNumOfReplicas > clusterSize) {
@@ -345,6 +367,7 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
       return new int[] {numOfReplicas, totalNumOfReplicas};
     }
 
+    LOG.info("GET MAX NODES PER RACK 2");
     int maxNodesPerRack = (totalNumOfReplicas-1)/numOfRacks + 2;
     // At this point, there are more than one racks and more than one replicas
     // to store. Avoid all replicas being in the same rack.
@@ -362,8 +385,8 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
     return new int[] {numOfReplicas, maxNodesPerRack};
   }
 
-  private EnumMap<StorageType, Integer> getRequiredStorageTypes(
-      List<StorageType> types) {
+  private EnumMap<StorageType, Integer> getRequiredStorageTypes(List<StorageType> types) {
+    LOG.info("GET REQUIRED STORAGE TYPES");
     EnumMap<StorageType, Integer> map = new EnumMap<>(StorageType.class);
     for (StorageType type : types) {
       if (!map.containsKey(type)) {
@@ -399,23 +422,28 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
                             final EnumSet<StorageType> unavailableStorages,
                             final boolean newBlock,
                             EnumMap<StorageType, Integer> storageTypes) {
+
+    LOG.info("THIS IS THE CHOOSE TARGET FROM ALL");
+
     if (numOfReplicas == 0 || clusterMap.getNumOfLeaves()==0) {
       return (writer instanceof DatanodeDescriptor) ? writer : null;
     }
     final int numOfResults = results.size();
     final int totalReplicasExpected = numOfReplicas + numOfResults;
+
+    LOG.info("CHOOSE TARGET {}, {}", numOfResults, totalReplicasExpected);
     if ((writer == null || !(writer instanceof DatanodeDescriptor)) && !newBlock) {
       writer = results.get(0).getDatanodeDescriptor();
     }
 
     // Keep a copy of original excludedNodes
     final Set<Node> oldExcludedNodes = new HashSet<>(excludedNodes);
+    LOG.info("Excluded Nodes {}", oldExcludedNodes.size());
 
     // choose storage types; use fallbacks for unavailable storages
-    final List<StorageType> requiredStorageTypes = storagePolicy
-        .chooseStorageTypes((short) totalReplicasExpected,
-            DatanodeStorageInfo.toStorageTypes(results),
-            unavailableStorages, newBlock);
+    final List<StorageType> requiredStorageTypes = storagePolicy.chooseStorageTypes((short) totalReplicasExpected,
+                                                                                    DatanodeStorageInfo.toStorageTypes(results),
+                                                                                    unavailableStorages, newBlock);
     if (storageTypes == null) {
       storageTypes = getRequiredStorageTypes(requiredStorageTypes);
     }
@@ -425,20 +453,19 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
 
     try {
       if ((numOfReplicas = requiredStorageTypes.size()) == 0) {
-        throw new NotEnoughReplicasException(
-            "All required storage types are unavailable: "
-            + " unavailableStorages=" + unavailableStorages
-            + ", storagePolicy=" + storagePolicy);
+        throw new NotEnoughReplicasException("All required storage types are unavailable: "
+                                              + " unavailableStorages=" + unavailableStorages
+                                              + ", storagePolicy=" + storagePolicy);
       }
       writer = chooseTargetInOrder(numOfReplicas, writer, excludedNodes, blocksize,
-          maxNodesPerRack, results, avoidStaleNodes, newBlock, storageTypes);
+              maxNodesPerRack, results, avoidStaleNodes, newBlock, storageTypes);
     } catch (NotEnoughReplicasException e) {
       final String message = "Failed to place enough replicas, still in need of "
-          + (totalReplicasExpected - results.size()) + " to reach "
-          + totalReplicasExpected
-          + " (unavailableStorages=" + unavailableStorages
-          + ", storagePolicy=" + storagePolicy
-          + ", newBlock=" + newBlock + ")";
+              + (totalReplicasExpected - results.size()) + " to reach "
+              + totalReplicasExpected
+              + " (unavailableStorages=" + unavailableStorages
+              + ", storagePolicy=" + storagePolicy
+              + ", newBlock=" + newBlock + ")";
 
       if (LOG.isTraceEnabled()) {
         LOG.trace(message, e);
@@ -446,24 +473,25 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
         LOG.warn(message + " " + e.getMessage());
       }
 
-      if (avoidStaleNodes) {
-        // Retry chooseTarget again, this time not avoiding stale nodes.
+//      if (avoidStaleNodes) {
+//        // Retry chooseTarget again, this time not avoiding stale nodes.
+//
+//        // excludedNodes contains the initial excludedNodes and nodes that were
+//        // not chosen because they were stale, decommissioned, etc.
+//        // We need to additionally exclude the nodes that were added to the
+//        // result list in the successful calls to choose*() above.
+//        for (DatanodeStorageInfo resultStorage : results) {
+//          addToExcludedNodes(resultStorage.getDatanodeDescriptor(), oldExcludedNodes);
+//        }
+//        // Set numOfReplicas, since it can get out of sync with the result list
+//        // if the NotEnoughReplicasException was thrown in chooseRandom().
+//        numOfReplicas = totalReplicasExpected - results.size();
+//        return chooseTarget(numOfReplicas, writer, oldExcludedNodes, blocksize,
+//                maxNodesPerRack, results, false, storagePolicy, unavailableStorages,
+//                newBlock, null);
+//      }
 
-        // excludedNodes contains the initial excludedNodes and nodes that were
-        // not chosen because they were stale, decommissioned, etc.
-        // We need to additionally exclude the nodes that were added to the 
-        // result list in the successful calls to choose*() above.
-        for (DatanodeStorageInfo resultStorage : results) {
-          addToExcludedNodes(resultStorage.getDatanodeDescriptor(), oldExcludedNodes);
-        }
-        // Set numOfReplicas, since it can get out of sync with the result list
-        // if the NotEnoughReplicasException was thrown in chooseRandom().
-        numOfReplicas = totalReplicasExpected - results.size();
-        return chooseTarget(numOfReplicas, writer, oldExcludedNodes, blocksize,
-            maxNodesPerRack, results, false, storagePolicy, unavailableStorages,
-            newBlock, null);
-      }
-
+      //TODO this does not seem to affect anything
       boolean retry = false;
       // simply add all the remaining types into unavailableStorages and give
       // another try. No best effort is guaranteed here.
@@ -474,37 +502,39 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
         }
       }
       if (retry) {
+        LOG.info("RETRY CHECK  {}", retry);
         for (DatanodeStorageInfo resultStorage : results) {
-          addToExcludedNodes(resultStorage.getDatanodeDescriptor(),
-              oldExcludedNodes);
+          LOG.info("RETRY RESULTS {}", resultStorage.toString());
+          addToExcludedNodes(resultStorage.getDatanodeDescriptor(), oldExcludedNodes);
         }
         numOfReplicas = totalReplicasExpected - results.size();
+        LOG.info("RETRY replicas  {}", numOfReplicas);
         return chooseTarget(numOfReplicas, writer, oldExcludedNodes, blocksize,
-            maxNodesPerRack, results, false, storagePolicy, unavailableStorages,
-            newBlock, null);
+                maxNodesPerRack, results, false, storagePolicy, unavailableStorages,
+                newBlock, null);
       }
     }
     return writer;
   }
 
-  protected Node chooseTargetInOrder(int numOfReplicas, 
-                                 Node writer,
-                                 final Set<Node> excludedNodes,
-                                 final long blocksize,
-                                 final int maxNodesPerRack,
-                                 final List<DatanodeStorageInfo> results,
-                                 final boolean avoidStaleNodes,
-                                 final boolean newBlock,
-                                 EnumMap<StorageType, Integer> storageTypes)
-                                 throws NotEnoughReplicasException {
+  protected Node chooseTargetInOrder(int numOfReplicas,
+                                     Node writer,
+                                     final Set<Node> excludedNodes,
+                                     final long blocksize,
+                                     final int maxNodesPerRack,
+                                     final List<DatanodeStorageInfo> results,
+                                     final boolean avoidStaleNodes,
+                                     final boolean newBlock,
+                                     EnumMap<StorageType, Integer> storageTypes) throws NotEnoughReplicasException {
+    LOG.info("ChooseTarget In order Init");
     final int numOfResults = results.size();
+    LOG.info("numOfResults  {}", numOfResults);
     if (numOfResults == 0) {
       DatanodeStorageInfo storageInfo = chooseLocalStorage(writer,
-          excludedNodes, blocksize, maxNodesPerRack, results, avoidStaleNodes,
-          storageTypes, true);
+              excludedNodes, blocksize, maxNodesPerRack, results, avoidStaleNodes,
+              storageTypes, true);
 
-      writer = (storageInfo != null) ? storageInfo.getDatanodeDescriptor()
-                                     : null;
+      writer = (storageInfo != null) ? storageInfo.getDatanodeDescriptor() : null;
 
       if (--numOfReplicas == 0) {
         return writer;
@@ -513,7 +543,7 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
     final DatanodeDescriptor dn0 = results.get(0).getDatanodeDescriptor();
     if (numOfResults <= 1) {
       chooseRemoteRack(1, dn0, excludedNodes, blocksize, maxNodesPerRack,
-          results, avoidStaleNodes, storageTypes);
+              results, avoidStaleNodes, storageTypes);
       if (--numOfReplicas == 0) {
         return writer;
       }
@@ -522,31 +552,33 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
       final DatanodeDescriptor dn1 = results.get(1).getDatanodeDescriptor();
       if (clusterMap.isOnSameRack(dn0, dn1)) {
         chooseRemoteRack(1, dn0, excludedNodes, blocksize, maxNodesPerRack,
-            results, avoidStaleNodes, storageTypes);
+                results, avoidStaleNodes, storageTypes);
       } else if (newBlock){
         chooseLocalRack(dn1, excludedNodes, blocksize, maxNodesPerRack,
-            results, avoidStaleNodes, storageTypes);
+                results, avoidStaleNodes, storageTypes);
       } else {
         chooseLocalRack(writer, excludedNodes, blocksize, maxNodesPerRack,
-            results, avoidStaleNodes, storageTypes);
+                results, avoidStaleNodes, storageTypes);
       }
       if (--numOfReplicas == 0) {
         return writer;
       }
     }
     chooseRandom(numOfReplicas, NodeBase.ROOT, excludedNodes, blocksize,
-        maxNodesPerRack, results, avoidStaleNodes, storageTypes);
+            maxNodesPerRack, results, avoidStaleNodes, storageTypes);
     return writer;
   }
 
   protected DatanodeStorageInfo chooseLocalStorage(Node localMachine,
-      Set<Node> excludedNodes, long blocksize, int maxNodesPerRack,
-      List<DatanodeStorageInfo> results, boolean avoidStaleNodes,
-      EnumMap<StorageType, Integer> storageTypes)
-      throws NotEnoughReplicasException {
+                                                   Set<Node> excludedNodes,
+                                                   long blocksize,
+                                                   int maxNodesPerRack,
+                                                   List<DatanodeStorageInfo> results,
+                                                   boolean avoidStaleNodes,
+                                                   EnumMap<StorageType, Integer> storageTypes) throws NotEnoughReplicasException {
     return chooseLocalOrFavoredStorage(localMachine, false,
-        excludedNodes, blocksize, maxNodesPerRack, results, avoidStaleNodes,
-        storageTypes);
+            excludedNodes, blocksize, maxNodesPerRack, results, avoidStaleNodes,
+            storageTypes);
   }
 
   /**
@@ -563,29 +595,34 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
    * @throws NotEnoughReplicasException
    */
   protected DatanodeStorageInfo chooseLocalOrFavoredStorage(
-      Node localOrFavoredNode, boolean isFavoredNode, Set<Node> excludedNodes,
-      long blocksize, int maxNodesPerRack, List<DatanodeStorageInfo> results,
-      boolean avoidStaleNodes, EnumMap<StorageType, Integer> storageTypes)
-      throws NotEnoughReplicasException {
+                                        Node localOrFavoredNode,
+                                        boolean isFavoredNode,
+                                        Set<Node> excludedNodes,
+                                        long blocksize,
+                                        int maxNodesPerRack,
+                                        List<DatanodeStorageInfo> results,
+                                        boolean avoidStaleNodes,
+                                        EnumMap<StorageType, Integer> storageTypes) throws NotEnoughReplicasException {
+    LOG.info("chooseLocalOrFavoredStorage INIT");
+
+
     // if no local machine, randomly choose one node
     if (localOrFavoredNode == null) {
       return chooseRandom(NodeBase.ROOT, excludedNodes, blocksize,
-          maxNodesPerRack, results, avoidStaleNodes, storageTypes);
+              maxNodesPerRack, results, avoidStaleNodes, storageTypes);
     }
-    if ((preferLocalNode || isFavoredNode)
-        && localOrFavoredNode instanceof DatanodeDescriptor
-        && clusterMap.contains(localOrFavoredNode)) {
-      DatanodeDescriptor localDatanode =
-          (DatanodeDescriptor) localOrFavoredNode;
+    if ((preferLocalNode || isFavoredNode) && localOrFavoredNode instanceof DatanodeDescriptor && clusterMap.contains(localOrFavoredNode)) {
+
+      LOG.info("chooseLocalOrFavoredStorage LOCAL");
+      DatanodeDescriptor localDatanode = (DatanodeDescriptor) localOrFavoredNode;
       // otherwise try local machine first
       if (excludedNodes.add(localOrFavoredNode) // was not in the excluded list
-          && isGoodDatanode(localDatanode, maxNodesPerRack,
-              results, avoidStaleNodes)) {
-        for (Iterator<Map.Entry<StorageType, Integer>> iter = storageTypes
-            .entrySet().iterator(); iter.hasNext(); ) {
+              && isGoodDatanode(localDatanode, maxNodesPerRack, results, avoidStaleNodes)) {
+
+        for (Iterator<Map.Entry<StorageType, Integer>> iter = storageTypes.entrySet().iterator(); iter.hasNext(); ) {
           Map.Entry<StorageType, Integer> entry = iter.next();
-          DatanodeStorageInfo localStorage = chooseStorage4Block(
-              localDatanode, blocksize, results, entry.getKey());
+          DatanodeStorageInfo localStorage = chooseStorage4Block(localDatanode, blocksize, results, entry.getKey());
+
           if (localStorage != null) {
             // add node and related nodes to excludedNode
             addToExcludedNodes(localDatanode, excludedNodes);
@@ -610,13 +647,17 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
    * @return the chosen storage
    */
   protected DatanodeStorageInfo chooseLocalStorage(Node localMachine,
-      Set<Node> excludedNodes, long blocksize, int maxNodesPerRack,
-      List<DatanodeStorageInfo> results, boolean avoidStaleNodes,
-      EnumMap<StorageType, Integer> storageTypes, boolean fallbackToLocalRack)
-      throws NotEnoughReplicasException {
+                                                   Set<Node> excludedNodes,
+                                                   long blocksize,
+                                                   int maxNodesPerRack,
+                                                   List<DatanodeStorageInfo> results,
+                                                   boolean avoidStaleNodes,
+                                                   EnumMap<StorageType, Integer> storageTypes,
+                                                   boolean fallbackToLocalRack) throws NotEnoughReplicasException {
+    LOG.info("THIS IS CHOOSE LOCAL STORAGE");
     DatanodeStorageInfo localStorage = chooseLocalStorage(localMachine,
-        excludedNodes, blocksize, maxNodesPerRack, results,
-        avoidStaleNodes, storageTypes);
+            excludedNodes, blocksize, maxNodesPerRack, results,
+            avoidStaleNodes, storageTypes);
     if (localStorage != null) {
       return localStorage;
     }
@@ -626,9 +667,9 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
     }
     // try a node on local rack
     return chooseLocalRack(localMachine, excludedNodes, blocksize,
-        maxNodesPerRack, results, avoidStaleNodes, storageTypes);
+            maxNodesPerRack, results, avoidStaleNodes, storageTypes);
   }
-  
+
   /**
    * Add <i>localMachine</i> and related nodes to <i>excludedNodes</i>
    * for next replica choosing. In sub class, we can add more nodes within
@@ -636,7 +677,8 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
    * @return number of new excluded nodes
    */
   protected int addToExcludedNodes(DatanodeDescriptor localMachine,
-      Set<Node> excludedNodes) {
+                                   Set<Node> excludedNodes) {
+    LOG.info("ADD EXCLUDED NODES");
     return excludedNodes.add(localMachine) ? 1 : 0;
   }
 
@@ -644,7 +686,7 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
    * Choose one node from the rack that <i>localMachine</i> is on.
    * if no such node is available, choose one node from the rack where
    * a second replica is on.
-   * if still no such node is available, choose a random node 
+   * if still no such node is available, choose a random node
    * in the cluster.
    * @return the chosen node
    */
@@ -654,19 +696,19 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
                                                 int maxNodesPerRack,
                                                 List<DatanodeStorageInfo> results,
                                                 boolean avoidStaleNodes,
-                                                EnumMap<StorageType, Integer> storageTypes)
-      throws NotEnoughReplicasException {
+                                                EnumMap<StorageType, Integer> storageTypes) throws NotEnoughReplicasException {
+    LOG.info("CHOOSE LOCAL RACK");
     // no local machine, so choose a random machine
     if (localMachine == null) {
       return chooseRandom(NodeBase.ROOT, excludedNodes, blocksize,
-          maxNodesPerRack, results, avoidStaleNodes, storageTypes);
+              maxNodesPerRack, results, avoidStaleNodes, storageTypes);
     }
     final String localRack = localMachine.getNetworkLocation();
-      
+
     try {
       // choose one from the local rack
       return chooseRandom(localRack, excludedNodes,
-          blocksize, maxNodesPerRack, results, avoidStaleNodes, storageTypes);
+              blocksize, maxNodesPerRack, results, avoidStaleNodes, storageTypes);
     } catch (NotEnoughReplicasException e) {
       // find the next replica and retry with its rack
       for(DatanodeStorageInfo resultStorage : results) {
@@ -674,75 +716,75 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
         if (nextNode != localMachine) {
           if (LOG.isDebugEnabled()) {
             LOG.debug("Failed to choose from local rack (location = " + localRack
-                + "), retry with the rack of the next replica (location = "
-                + nextNode.getNetworkLocation() + ")", e);
+                    + "), retry with the rack of the next replica (location = "
+                    + nextNode.getNetworkLocation() + ")", e);
           }
           return chooseFromNextRack(nextNode, excludedNodes, blocksize,
-              maxNodesPerRack, results, avoidStaleNodes, storageTypes);
+                  maxNodesPerRack, results, avoidStaleNodes, storageTypes);
         }
       }
 
       if (LOG.isDebugEnabled()) {
         LOG.debug("Failed to choose from local rack (location = " + localRack
-            + "); the second replica is not found, retry choosing randomly", e);
+                + "); the second replica is not found, retry choosing randomly", e);
       }
       //the second replica is not found, randomly choose one from the network
       return chooseRandom(NodeBase.ROOT, excludedNodes, blocksize,
-          maxNodesPerRack, results, avoidStaleNodes, storageTypes);
+              maxNodesPerRack, results, avoidStaleNodes, storageTypes);
     }
   }
 
   private DatanodeStorageInfo chooseFromNextRack(Node next,
-      Set<Node> excludedNodes,
-      long blocksize,
-      int maxNodesPerRack,
-      List<DatanodeStorageInfo> results,
-      boolean avoidStaleNodes,
-      EnumMap<StorageType, Integer> storageTypes) throws NotEnoughReplicasException {
+                                                 Set<Node> excludedNodes,
+                                                 long blocksize,
+                                                 int maxNodesPerRack,
+                                                 List<DatanodeStorageInfo> results,
+                                                 boolean avoidStaleNodes,
+                                                 EnumMap<StorageType, Integer> storageTypes) throws NotEnoughReplicasException {
+    LOG.info("CHOOSE FROM NEXT RACK");
     final String nextRack = next.getNetworkLocation();
     try {
       return chooseRandom(nextRack, excludedNodes, blocksize, maxNodesPerRack,
-          results, avoidStaleNodes, storageTypes);
+              results, avoidStaleNodes, storageTypes);
     } catch(NotEnoughReplicasException e) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Failed to choose from the next rack (location = " + nextRack
-            + "), retry choosing randomly", e);
+        LOG.debug("Failed to choose from the next rack (location = " + nextRack + "), retry choosing randomly", e);
       }
       //otherwise randomly choose one from the network
       return chooseRandom(NodeBase.ROOT, excludedNodes, blocksize,
-          maxNodesPerRack, results, avoidStaleNodes, storageTypes);
+              maxNodesPerRack, results, avoidStaleNodes, storageTypes);
     }
   }
 
-  /** 
-   * Choose <i>numOfReplicas</i> nodes from the racks 
+  /**
+   * Choose <i>numOfReplicas</i> nodes from the racks
    * that <i>localMachine</i> is NOT on.
    * If not enough nodes are available, choose the remaining ones
    * from the local rack
    */
   protected void chooseRemoteRack(int numOfReplicas,
-                                DatanodeDescriptor localMachine,
-                                Set<Node> excludedNodes,
-                                long blocksize,
-                                int maxReplicasPerRack,
-                                List<DatanodeStorageInfo> results,
-                                boolean avoidStaleNodes,
-                                EnumMap<StorageType, Integer> storageTypes)
-                                    throws NotEnoughReplicasException {
+                                  DatanodeDescriptor localMachine,
+                                  Set<Node> excludedNodes,
+                                  long blocksize,
+                                  int maxReplicasPerRack,
+                                  List<DatanodeStorageInfo> results,
+                                  boolean avoidStaleNodes,
+                                  EnumMap<StorageType, Integer> storageTypes) throws NotEnoughReplicasException {
+    LOG.info("CHOOSE REMOTE RACK");
     int oldNumOfReplicas = results.size();
     // randomly choose one node from remote racks
     try {
       chooseRandom(numOfReplicas, "~" + localMachine.getNetworkLocation(),
-          excludedNodes, blocksize, maxReplicasPerRack, results,
-          avoidStaleNodes, storageTypes);
+              excludedNodes, blocksize, maxReplicasPerRack, results,
+              avoidStaleNodes, storageTypes);
     } catch (NotEnoughReplicasException e) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Failed to choose remote rack (location = ~"
-            + localMachine.getNetworkLocation() + "), fallback to local rack", e);
+                + localMachine.getNetworkLocation() + "), fallback to local rack", e);
       }
       chooseRandom(numOfReplicas-(results.size()-oldNumOfReplicas),
-                   localMachine.getNetworkLocation(), excludedNodes, blocksize, 
-                   maxReplicasPerRack, results, avoidStaleNodes, storageTypes);
+              localMachine.getNetworkLocation(), excludedNodes, blocksize,
+              maxReplicasPerRack, results, avoidStaleNodes, storageTypes);
     }
   }
 
@@ -751,15 +793,14 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
    * @return the chosen storage, if there is any.
    */
   protected DatanodeStorageInfo chooseRandom(String scope,
-      Set<Node> excludedNodes,
-      long blocksize,
-      int maxNodesPerRack,
-      List<DatanodeStorageInfo> results,
-      boolean avoidStaleNodes,
-      EnumMap<StorageType, Integer> storageTypes)
-          throws NotEnoughReplicasException {
+                                             Set<Node> excludedNodes,
+                                             long blocksize,
+                                             int maxNodesPerRack,
+                                             List<DatanodeStorageInfo> results,
+                                             boolean avoidStaleNodes,
+                                             EnumMap<StorageType, Integer> storageTypes) throws NotEnoughReplicasException {
     return chooseRandom(1, scope, excludedNodes, blocksize, maxNodesPerRack,
-        results, avoidStaleNodes, storageTypes);
+            results, avoidStaleNodes, storageTypes);
   }
 
   /**
@@ -767,14 +808,15 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
    * @return the first chosen node, if there is any.
    */
   protected DatanodeStorageInfo chooseRandom(int numOfReplicas,
-                            String scope,
-                            Set<Node> excludedNodes,
-                            long blocksize,
-                            int maxNodesPerRack,
-                            List<DatanodeStorageInfo> results,
-                            boolean avoidStaleNodes,
-                            EnumMap<StorageType, Integer> storageTypes)
-                            throws NotEnoughReplicasException {
+                                             String scope,
+                                             Set<Node> excludedNodes,
+                                             long blocksize,
+                                             int maxNodesPerRack,
+                                             List<DatanodeStorageInfo> results,
+                                             boolean avoidStaleNodes,
+                                             EnumMap<StorageType, Integer> storageTypes) throws NotEnoughReplicasException {
+
+    LOG.info("CHOOSE RANDOM");
     StringBuilder builder = debugLoggingBuilder.get();
     if (LOG.isDebugEnabled()) {
       builder.setLength(0);
@@ -790,6 +832,7 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
       if (clusterMap instanceof DFSNetworkTopology) {
         for (StorageType type : storageTypes.keySet()) {
           chosenNode = chooseDataNode(scope, excludedNodes, type);
+//          LOG.info("CHOSEN NODE {}", chosenNode.getIpAddr());
 
           if (chosenNode != null) {
             includeType = type;
@@ -803,17 +846,15 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
       if (chosenNode == null) {
         break;
       }
+      LOG.info("CHOSEN NODE {}", chosenNode.getIpAddr());
       Preconditions.checkState(excludedNodes.add(chosenNode), "chosenNode "
-          + chosenNode + " is already in excludedNodes " + excludedNodes);
+              + chosenNode + " is already in excludedNodes " + excludedNodes);
       if (LOG.isDebugEnabled() && builder != null) {
-        builder.append("\nNode ").append(NodeBase.getPath(chosenNode))
-            .append(" [");
+        builder.append("\nNode ").append(NodeBase.getPath(chosenNode)).append(" [");
       }
       DatanodeStorageInfo storage = null;
-      if (isGoodDatanode(chosenNode, maxNodesPerRack,
-          results, avoidStaleNodes)) {
-        for (Iterator<Map.Entry<StorageType, Integer>> iter = storageTypes
-            .entrySet().iterator(); iter.hasNext();) {
+      if (isGoodDatanode(chosenNode, maxNodesPerRack, results, avoidStaleNodes)) {
+        for (Iterator<Map.Entry<StorageType, Integer>> iter = storageTypes.entrySet().iterator(); iter.hasNext();) {
           Map.Entry<StorageType, Integer> entry = iter.next();
 
           // If there is one storage type the node has already contained,
@@ -822,8 +863,7 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
             continue;
           }
 
-          storage = chooseStorage4Block(
-              chosenNode, blocksize, results, entry.getKey());
+          storage = chooseStorage4Block(chosenNode, blocksize, results, entry.getKey());
           if (storage != null) {
             numOfReplicas--;
             if (firstChosen == null) {
@@ -849,6 +889,8 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
         badTarget = (storage == null);
       }
     }
+
+    //TODO this seems to be used for debugging
     if (numOfReplicas>0) {
       String detail = enableDebugLogging;
       if (LOG.isDebugEnabled() && builder != null) {
@@ -865,13 +907,13 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
         }
       }
       final HashMap<NodeNotChosenReason, Integer> reasonMap =
-          CHOOSE_RANDOM_REASONS.get();
+              CHOOSE_RANDOM_REASONS.get();
       if (!reasonMap.isEmpty()) {
         LOG.info("Not enough replicas was chosen. Reason:{}", reasonMap);
       }
       throw new NotEnoughReplicasException(detail);
     }
-    
+
     return firstChosen;
   }
 
@@ -880,7 +922,8 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
    * @return the chosen node, if there is any.
    */
   protected DatanodeDescriptor chooseDataNode(final String scope,
-      final Collection<Node> excludedNodes) {
+                                              final Collection<Node> excludedNodes) {
+    LOG.info("NEW CHOOSE DATA NODE");
     return (DatanodeDescriptor) clusterMap.chooseRandom(scope, excludedNodes);
   }
 
@@ -890,9 +933,11 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
    * @return the chosen node, if there is any.
    */
   protected DatanodeDescriptor chooseDataNode(final String scope,
-      final Collection<Node> excludedNodes, StorageType type) {
+                                              final Collection<Node> excludedNodes,
+                                              StorageType type) {
+    LOG.info("NEW CHOOSE DATA NODE 2");
     return (DatanodeDescriptor) ((DFSNetworkTopology) clusterMap)
-        .chooseRandomWithStorageTypeTwoTrial(scope, excludedNodes, type);
+            .chooseRandomWithStorageTypeTwoTrial(scope, excludedNodes, type);
   }
 
   /**
@@ -906,46 +951,17 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
    * @return the chosen datanode storage
    */
   DatanodeStorageInfo chooseStorage4Block(DatanodeDescriptor dnd,
-      long blockSize,
-      List<DatanodeStorageInfo> results,
-      StorageType storageType) {
-    DatanodeStorageInfo storage =
-        dnd.chooseStorage4Block(storageType, blockSize);
+                                          long blockSize,
+                                          List<DatanodeStorageInfo> results,
+                                          StorageType storageType) {
+    LOG.info("CHOSEN STORAGE 4 BLOCK");
+    DatanodeStorageInfo storage = dnd.chooseStorage4Block(storageType, blockSize);
     if (storage != null) {
       results.add(storage);
     } else {
-      logNodeIsNotChosen(dnd, NodeNotChosenReason.NOT_ENOUGH_STORAGE_SPACE,
-          " for storage type " + storageType);
+      logNodeIsNotChosen(dnd, NodeNotChosenReason.NOT_ENOUGH_STORAGE_SPACE, " for storage type " + storageType);
     }
     return storage;
-  }
-
-  private static void logNodeIsNotChosen(DatanodeDescriptor node,
-      NodeNotChosenReason reason) {
-    logNodeIsNotChosen(node, reason, null);
-  }
-
-  private static void logNodeIsNotChosen(DatanodeDescriptor node,
-      NodeNotChosenReason reason, String reasonDetails) {
-    assert reason != null;
-    if (LOG.isDebugEnabled()) {
-      // build the error message for later use.
-      debugLoggingBuilder.get()
-          .append("\n  Datanode ").append(node)
-          .append(" is not chosen since ").append(reason.getText());
-      if (reasonDetails != null) {
-        debugLoggingBuilder.get().append(" ").append(reasonDetails);
-      }
-      debugLoggingBuilder.get().append(".");
-    }
-    // always populate reason map to log high level reasons.
-    final HashMap<NodeNotChosenReason, Integer> reasonMap =
-        CHOOSE_RANDOM_REASONS.get();
-    Integer base = reasonMap.get(reason);
-    if (base == null) {
-      base = 0;
-    }
-    reasonMap.put(reason, base + 1);
   }
 
 
@@ -965,6 +981,7 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
                          int maxTargetPerRack,
                          List<DatanodeStorageInfo> results,
                          boolean avoidStaleNodes) {
+    LOG.info("IS GOOD DATANODE");
     // check if the node is (being) decommissioned
     if (!node.isInService()) {
       logNodeIsNotChosen(node, NodeNotChosenReason.NOT_IN_SERVICE);
@@ -978,32 +995,31 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
 //      }
 //    }
 
-      
+    //TODO maybe check here whether the blocks are placed on different nodes
     // check if the target rack has chosen too many nodes
-    String rackname = node.getNetworkLocation();
-    int counter=1;
-    for(DatanodeStorageInfo resultStorage : results) {
-      if (rackname.equals(
-          resultStorage.getDatanodeDescriptor().getNetworkLocation())) {
-        counter++;
-      }
-    }
-    if (counter > maxTargetPerRack) {
-      logNodeIsNotChosen(node, NodeNotChosenReason.TOO_MANY_NODES_ON_RACK);
-      return false;
-    }
+//    String rackname = node.getNetworkLocation();
+//    int counter=1;
+//    for(DatanodeStorageInfo resultStorage : results) {
+//      if (rackname.equals(resultStorage.getDatanodeDescriptor().getNetworkLocation())) {
+//        counter++;
+//      }
+//    }
+//    if (counter > maxTargetPerRack) {
+//      logNodeIsNotChosen(node, NodeNotChosenReason.TOO_MANY_NODES_ON_RACK);
+//      return false;
+//    }
 
     return true;
   }
 
   /**
    * Return a pipeline of nodes.
-   * The pipeline is formed finding a shortest path that 
+   * The pipeline is formed finding a shortest path that
    * starts from the writer and traverses all <i>nodes</i>
    * This is basically a traveling salesman problem.
    */
-  private DatanodeStorageInfo[] getPipeline(Node writer,
-      DatanodeStorageInfo[] storages) {
+  private DatanodeStorageInfo[] getPipeline(Node writer, DatanodeStorageInfo[] storages) {
+    LOG.info("GET PIPELINE");
     if (storages.length == 0) {
       return storages;
     }
@@ -1016,11 +1032,11 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
       for(; index < storages.length; index++) {
         DatanodeStorageInfo shortestStorage = storages[index];
         int shortestDistance = clusterMap.getDistance(writer,
-            shortestStorage.getDatanodeDescriptor());
+                shortestStorage.getDatanodeDescriptor());
         int shortestIndex = index;
         for(int i = index + 1; i < storages.length; i++) {
           int currentDistance = clusterMap.getDistance(writer,
-              storages[i].getDatanodeDescriptor());
+                  storages[i].getDatanodeDescriptor());
           if (shortestDistance>currentDistance) {
             shortestDistance = currentDistance;
             shortestStorage = storages[i];
@@ -1039,24 +1055,72 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
   }
 
   @Override
-  public BlockPlacementStatus verifyBlockPlacement(DatanodeInfo[] locs,
-      int numberOfReplicas) {
+  public BlockPlacementStatus verifyBlockPlacement(DatanodeInfo[] locs, int numberOfReplicas) {
     if (locs == null)
       locs = DatanodeDescriptor.EMPTY_ARRAY;
     if (!clusterMap.hasClusterEverBeenMultiRack()) {
       // only one rack
       return new BlockPlacementStatusDefault(1, 1, 1);
     }
-    int minRacks = 2;
-    minRacks = Math.min(minRacks, numberOfReplicas);
-    // 1. Check that all locations are different.
-    // 2. Count locations on different racks.
-    Set<String> racks = new TreeSet<>();
-    for (DatanodeInfo dn : locs)
-      racks.add(dn.getNetworkLocation());
-    return new BlockPlacementStatusDefault(racks.size(), minRacks,
-        clusterMap.getNumOfRacks());
+    return new BlockPlacementStatusDefault(1, 1,1);
+    //TODO must check again
+//    int minRacks = 2;
+//    minRacks = Math.min(minRacks, numberOfReplicas);
+//    // 1. Check that all locations are different.
+//    // 2. Count locations on different racks.
+//    Set<String> racks = new TreeSet<>();
+//    for (DatanodeInfo dn : locs)
+//      racks.add(dn.getNetworkLocation());
+//    return new BlockPlacementStatusDefault(racks.size(), minRacks,
+//            clusterMap.getNumOfRacks());
   }
+
+  @Override
+  public List<DatanodeStorageInfo> chooseReplicasToDelete(
+          Collection<DatanodeStorageInfo> availableReplicas,
+          Collection<DatanodeStorageInfo> delCandidates,
+          int expectedNumOfReplicas,
+          List<StorageType> excessTypes,
+          DatanodeDescriptor addedNode,
+          DatanodeDescriptor delNodeHint) {
+
+    return null;
+  }
+
+  @Override
+  public boolean isMovable(Collection<DatanodeInfo> locs,
+                           DatanodeInfo source,
+                           DatanodeInfo target) {
+    return false;
+  }
+
+
+  private static void logNodeIsNotChosen(DatanodeDescriptor node, NodeNotChosenReason reason) {
+    logNodeIsNotChosen(node, reason, null);
+  }
+
+  private static void logNodeIsNotChosen(DatanodeDescriptor node, NodeNotChosenReason reason, String reasonDetails) {
+    assert reason != null;
+    if (LOG.isDebugEnabled()) {
+      // build the error message for later use.
+      debugLoggingBuilder.get()
+              .append("\n  Datanode ").append(node)
+              .append(" is not chosen since ").append(reason.getText());
+      if (reasonDetails != null) {
+        debugLoggingBuilder.get().append(" ").append(reasonDetails);
+      }
+      debugLoggingBuilder.get().append(".");
+    }
+    // always populate reason map to log high level reasons.
+    final HashMap<NodeNotChosenReason, Integer> reasonMap =
+            CHOOSE_RANDOM_REASONS.get();
+    Integer base = reasonMap.get(reason);
+    if (base == null) {
+      base = 0;
+    }
+    reasonMap.put(reason, base + 1);
+  }
+
 //  /**
 //   * Decide whether deleting the specified replica of the block still makes
 //   * the block conform to the configured block placement policy.
@@ -1113,8 +1177,7 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
 //    excessTypes.remove(storage.getStorageType());
 //    return storage;
 //  }
-
-  @Override
+//
 //  public List<DatanodeStorageInfo> chooseReplicasToDelete(
 //      Collection<DatanodeStorageInfo> availableReplicas,
 //      Collection<DatanodeStorageInfo> delCandidates,
@@ -1171,18 +1234,7 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
 //    return excessReplicas;
 //  }
 
-  public List<DatanodeStorageInfo> chooseReplicasToDelete(
-          Collection<DatanodeStorageInfo> availableReplicas,
-          Collection<DatanodeStorageInfo> delCandidates,
-          int expectedNumOfReplicas,
-          List<StorageType> excessTypes,
-          DatanodeDescriptor addedNode,
-          DatanodeDescriptor delNodeHint) {
-
-    return null;
-  }
-
-  /** Check if we can use delHint. */
+//  /** Check if we can use delHint. */
 //  @VisibleForTesting
 //  boolean useDelHint(DatanodeStorageInfo delHint,
 //      DatanodeStorageInfo added, List<DatanodeStorageInfo> moreThanOne,
@@ -1209,12 +1261,7 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
 //    return false; // removing delHint reduces the number of groups.
 //  }
 
-  @Override
-  public boolean isMovable(Collection<DatanodeInfo> locs,
-                           DatanodeInfo source,
-                           DatanodeInfo target) {
-    return false;
-  }
+
 
 //  public boolean isMovable(Collection<DatanodeInfo> locs,
 //                           DatanodeInfo source, DatanodeInfo target) {
@@ -1259,4 +1306,3 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
 //    this.preferLocalNode = prefer;
 //  }
 }
-
