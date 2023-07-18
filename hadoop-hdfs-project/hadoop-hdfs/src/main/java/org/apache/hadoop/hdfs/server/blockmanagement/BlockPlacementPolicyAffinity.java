@@ -93,6 +93,8 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
   protected NetworkTopology clusterMap;
   protected Host2NodesMap host2datanodeMap;
   private FSClusterStats stats;
+  protected Map<String, List<DatanodeDescriptor>> clientToDataNodesMap;
+  private String clientIP;
 //  protected long heartbeatInterval;   // interval for DataNode heartbeats
 //  private long staleInterval;   // interval used to identify stale DataNodes
 //
@@ -129,6 +131,8 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
 //            DFSConfigKeys.
 //                    DFS_NAMENODE_BLOCKPLACEMENTPOLICY_DEFAULT_PREFER_LOCAL_NODE_DEFAULT);
     this.preferLocalNode = false;
+    this.clientToDataNodesMap = new HashMap<>();
+    this.clientIP = null;
   }
 
   @Override
@@ -170,14 +174,22 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
                                      BlockStoragePolicy storagePolicy,
                                      EnumSet<AddBlockFlag> flags) {
     LOG.info("CHOOSE TARGET 2");
+    this.clientIP = writer.getName();
+
     try {
-      if (favoredNodes == null || favoredNodes.size() == 0) {
+      if ((favoredNodes == null || favoredNodes.size() == 0) && !this.clientToDataNodesMap.containsKey(this.clientIP)) {
         // Favored nodes not specified, fall back to regular block placement.
         return chooseTarget(src, numOfReplicas, writer,
                 new ArrayList<DatanodeStorageInfo>(numOfReplicas), false,
                 excludedNodes, blocksize, storagePolicy, flags);
       }
 
+      //SK_EDIT add to the favored nodes the nodes that we wish
+//      favoredNodes.addAll(this.clientToDataNodesMap.get(this.clientIP));
+      favoredNodes = this.clientToDataNodesMap.get(this.clientIP);
+      excludedNodes.add(writer);
+
+      //TODO add here excluded local node
       Set<Node> favoriteAndExcludedNodes = excludedNodes == null ? new HashSet<Node>() : new HashSet<>(excludedNodes);
 
       final List<StorageType> requiredStorageTypes = storagePolicy.chooseStorageTypes((short)numOfReplicas);
@@ -869,6 +881,7 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
             if (firstChosen == null) {
               firstChosen = storage;
             }
+            addNodeElement(this.clientToDataNodesMap, this.clientIP, chosenNode);
             // add node (subclasses may also add related nodes) to excludedNode
             addToExcludedNodes(chosenNode, excludedNodes);
             int num = entry.getValue();
@@ -906,8 +919,7 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
           detail = "";
         }
       }
-      final HashMap<NodeNotChosenReason, Integer> reasonMap =
-              CHOOSE_RANDOM_REASONS.get();
+      final HashMap<NodeNotChosenReason, Integer> reasonMap = CHOOSE_RANDOM_REASONS.get();
       if (!reasonMap.isEmpty()) {
         LOG.info("Not enough replicas was chosen. Reason:{}", reasonMap);
       }
@@ -915,6 +927,20 @@ public class BlockPlacementPolicyAffinity extends BlockPlacementPolicy {
     }
 
     return firstChosen;
+  }
+
+// TODO SK_HELPER FUNC
+  private static void addNodeElement(Map<String, List<DatanodeDescriptor>> dynamicHashMap, String key, DatanodeDescriptor value) {
+    // Check if the key is already present in the HashMap
+    if (dynamicHashMap.containsKey(key)) {
+      // Key exists, append the value to the existing List
+      dynamicHashMap.get(key).add(value);
+    } else {
+      // Key does not exist, create a new List and add the value
+      List<DatanodeDescriptor> newList = new ArrayList<>();
+      newList.add(value);
+      dynamicHashMap.put(key, newList);
+    }
   }
 
   /**
